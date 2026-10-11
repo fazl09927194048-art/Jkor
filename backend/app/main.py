@@ -51,10 +51,9 @@ app.add_middleware(
 )
 
 
-class ChatBody(BaseModel):
+class ChatBody(ChatRequest):
     message: str = Field(min_length=1, max_length=20000)
     model: str | None = Field(default=None, max_length=200)
-    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=20)
 
 
 class VideoPlanBody(BaseModel):
@@ -86,7 +85,7 @@ async def chat(body: ChatBody):
     if not body.message.strip():
         raise HTTPException(status_code=422, detail="Message cannot be blank.")
     try:
-        result = await ollama.chat(ChatRequest(message=body.message, model=body.model, history=body.history))
+        result = await ollama.chat(body)
         return result.model_dump()
     except ProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
