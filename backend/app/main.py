@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from .catalog import build_catalog
 from .capabilities import build_capability_registry
+from .integrations import integration_registry
 from .providers.base import ChatRequest, ProviderError
 from .providers.ollama import OllamaProvider
 
@@ -78,3 +79,8 @@ async def capabilities():
     connected = await ollama.health()
     available = await ollama.available_models() if connected else []
     return build_capability_registry(connected, available)
+
+
+@app.get("/api/v1/integrations")
+async def integrations():
+    return integration_registry()
