@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from .catalog import build_catalog
 from .capabilities import build_capability_registry
 from .integrations import integration_registry
+from .ai_security_eval import build_eval_suite, score_supplied_outputs
 from .video_planner import build_video_plan
 from .providers.base import ChatRequest, ProviderError
 from .providers.ollama import OllamaProvider
@@ -50,6 +51,10 @@ class VideoPlanBody(BaseModel):
     provider_id: str | None = Field(default=None, max_length=200)
     segment_limit_seconds: int | None = Field(default=None, ge=1, le=3600)
     stitching_allowed: bool | None = None
+
+
+class SecurityEvalOutputs(BaseModel):
+    outputs: dict[str, str] = Field(default_factory=dict)
 
 
 @app.get("/health")
@@ -107,3 +112,18 @@ async def video_plan(body: VideoPlanBody):
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+
+@app.get("/api/v1/security/eval-suite")
+async def security_eval_suite():
+    return build_eval_suite()
+
+
+@app.post("/api/v1/security/score")
+async def security_eval_score(body: SecurityEvalOutputs):
+    if len(body.outputs) > 100:
+        raise HTTPException(status_code=422, detail="At most 100 supplied outputs are allowed.")
+    if any(len(key) > 200 or len(value) > 20000 for key, value in body.outputs.items()):
+        raise HTTPException(status_code=422, detail="Output keys or values exceed allowed length.")
+    return score_supplied_outputs(body.outputs)
