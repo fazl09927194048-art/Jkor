@@ -180,3 +180,12 @@ def test_chat_rejects_more_than_twenty_history_messages():
     })
     assert response.status_code == 422
 
+
+
+def test_chat_rejects_invalid_or_unsupported_image_payloads():
+    invalid = client.post("/api/v1/chat", json={"message": "describe", "images": ["not-base64"]})
+    unsupported = client.post("/api/v1/chat", json={"message": "describe", "images": ["eHh4"]})
+    too_many = client.post("/api/v1/chat", json={"message": "describe", "images": [""] * 3})
+    assert invalid.status_code == 422
+    assert unsupported.status_code == 422
+    assert too_many.status_code == 422
