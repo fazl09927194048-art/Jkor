@@ -50,7 +50,10 @@ class OllamaProvider(ChatProvider):
             return []
 
     async def chat(self, request: ChatRequest) -> ChatResult:
-        model = request.model or self.default_model
+        requested_model = request.model.strip() if isinstance(request.model, str) else ""
+        model = requested_model or self.default_model.strip()
+        if not model:
+            raise ProviderError("No Ollama model is configured. Set OLLAMA_DEFAULT_MODEL and retry.")
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
