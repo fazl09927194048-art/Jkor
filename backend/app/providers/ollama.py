@@ -1,0 +1,53 @@
+import httpx
+
+from .base import ChatProvider, ChatRequest, ChatResult, ProviderError
+
+
+class OllamaProvider(ChatProvider):
+    name = "ollama"
+
+    def __init__(self, base_url: str, default_model: str, timeout: float = 45):
+        self.base_url = base_url.rstrip("/")
+        self.default_model = default_model
+        self.timeout = timeout
+
+    async def health(self) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=3) as client:
+                response = await client.get(self.base_url + "/api/tags")
+                return response.is_success
+        except httpx.HTTPError:
+            return False
+
+    async def available_models(self) -> list[str]:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                response = await client.get(self.base_url + "/api/tags")
+                response.raise_for_status()
+                payload = response.json()
+                return [item["name"] for item in payload.get("models", []) if item.get("name")]
+        except (httpx.HTTPError, ValueError):
+            return []
+
+    async def chat(self, request: ChatRequest) -> ChatResult:
+        model = request.model or self.default_model
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    self.base_url + "/api/chat",
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": request.message}],
+                        "stream": False,
+                    },
+                )
+                response.raise_for_status()
+                payload = response.json()
+                answer = payload.get("message", {}).get("content")
+                if not isinstance(answer, str) or not answer.strip():
+                    raise ProviderError("Ollama returned an empty or invalid response.")
+                return ChatResult(provider=self.name, model=model, text=answer)
+        except httpx.HTTPError as exc:
+            raise ProviderError(
+                "Local Ollama is unavailable. Start Ollama and pull a model, then retry."
+            ) from exc
