@@ -25,8 +25,17 @@ class OllamaProvider(ChatProvider):
                 response = await client.get(self.base_url + "/api/tags")
                 response.raise_for_status()
                 payload = response.json()
-                return [item["name"] for item in payload.get("models", []) if item.get("name")]
-        except (httpx.HTTPError, ValueError):
+                if not isinstance(payload, dict):
+                    return []
+                models = payload.get("models", [])
+                if not isinstance(models, list):
+                    return []
+                return [
+                    item["name"]
+                    for item in models
+                    if isinstance(item, dict) and isinstance(item.get("name"), str) and item["name"].strip()
+                ]
+        except (httpx.HTTPError, ValueError, TypeError, AttributeError):
             return []
 
     async def chat(self, request: ChatRequest) -> ChatResult:
