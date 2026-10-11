@@ -16,7 +16,7 @@ from .integrations import integration_registry
 from .ai_security_eval import build_eval_suite, score_supplied_outputs
 from .model_eval_report import build_eval_report
 from .video_planner import build_video_plan
-from .providers.base import ChatRequest, ProviderError
+from .providers.base import ChatHistoryMessage, ChatRequest, ProviderError
 from .providers.ollama import OllamaProvider
 
 
@@ -54,6 +54,7 @@ app.add_middleware(
 class ChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     model: str | None = Field(default=None, max_length=200)
+    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=20)
 
 
 class VideoPlanBody(BaseModel):
@@ -85,7 +86,7 @@ async def chat(body: ChatBody):
     if not body.message.strip():
         raise HTTPException(status_code=422, detail="Message cannot be blank.")
     try:
-        result = await ollama.chat(ChatRequest(message=body.message, model=body.model))
+        result = await ollama.chat(ChatRequest(message=body.message, model=body.model, history=body.history))
         return result.model_dump()
     except ProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
