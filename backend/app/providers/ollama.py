@@ -60,7 +60,10 @@ class OllamaProvider(ChatProvider):
                     self.base_url + "/api/chat",
                     json={
                         "model": model,
-                        "messages": [{"role": "user", "content": request.message}],
+                        "messages": [
+                            *[item.model_dump() for item in request.history],
+                            {"role": "user", "content": request.message},
+                        ],
                         "stream": False,
                     },
                 )
