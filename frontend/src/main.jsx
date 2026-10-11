@@ -95,7 +95,15 @@ function App() {
       const response = await fetch(API + '/api/v1/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, ...(selectedModel ? { model: selectedModel } : {}) })
+        body: JSON.stringify({
+          message,
+          history: messages.slice(1)
+            .filter(item => item.role === 'user' || item.role === 'assistant')
+            .slice(-20)
+            .map(item => ({ role: item.role, content: item.text.slice(-4000) }))
+            .filter(item => item.content.trim()),
+          ...(selectedModel ? { model: selectedModel } : {})
+        })
       });
       const payload = await readApiPayload(response, 'The API returned an unreadable response. Check that the backend URL is correct and the backend is running.');
       if (!response.ok) throw new Error(payload.detail || 'The model did not respond.');
