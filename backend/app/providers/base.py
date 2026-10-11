@@ -30,8 +30,8 @@ class ChatRequest(BaseModel):
             if not raw or len(raw) > 4 * 1024 * 1024:
                 raise ValueError("Each image must be no larger than 4 MiB.")
             valid = (
-                raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
-                or raw.startswith(b"\\xff\\xd8\\xff")
+                raw.startswith(b"\x89PNG\r\n\x1a\n")
+                or raw.startswith(b"\xff\xd8\xff")
                 or raw.startswith((b"GIF87a", b"GIF89a"))
                 or (len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP")
             )
