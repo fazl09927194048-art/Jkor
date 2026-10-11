@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .catalog import build_catalog
+from .capabilities import build_capability_registry
 from .providers.base import ChatRequest, ProviderError
 from .providers.ollama import OllamaProvider
 
@@ -62,3 +63,18 @@ async def chat(body: ChatBody):
         return result.model_dump()
     except ProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/models")
+async def models():
+    connected = await ollama.health()
+    available = await ollama.available_models() if connected else []
+    registry = build_capability_registry(connected, available)
+    return {"models": registry["models"], "notice": registry["notice"]}
+
+
+@app.get("/api/v1/capabilities")
+async def capabilities():
+    connected = await ollama.health()
+    available = await ollama.available_models() if connected else []
+    return build_capability_registry(connected, available)
