@@ -21,6 +21,8 @@ function App() {
   const [integrations, setIntegrations] = useState([]);
   const [messages, setMessages] = useState([{ role: 'assistant', text: 'Welcome to NEXUS AI. I will only show capabilities that are actually configured and reachable. Connect a local Ollama model to begin.' }]);
   const [draft, setDraft] = useState('');
+  const [attachedImages, setAttachedImages] = useState([]);
+  const [imageError, setImageError] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -102,12 +104,14 @@ function App() {
             .slice(-20)
             .map(item => ({ role: item.role, content: item.text.slice(-4000) }))
             .filter(item => item.content.trim()),
+          images: attachedImages.map(item => item.data),
           ...(selectedModel ? { model: selectedModel } : {})
         })
       });
       const payload = await readApiPayload(response, 'The API returned an unreadable response. Check that the backend URL is correct and the backend is running.');
       if (!response.ok) throw new Error(payload.detail || 'The model did not respond.');
       setMessages(prev => [...prev, { role: 'assistant', text: payload.text, provider: payload.provider, model: payload.model }]);
+      setAttachedImages([]); setImageError('');
       refreshCatalog();
     } catch (err) {
       const note = err.message || 'Could not connect to NEXUS AI API.';
@@ -163,10 +167,29 @@ function App() {
         {evalReport && <div className="eval-report" aria-live="polite"><div className="eval-report-title"><strong>Evaluation report</strong><span>{evalReport.model_id}</span></div><div className="eval-stats"><div><strong>{evalReport.cases_total}</strong><small>Cases</small></div><div><strong>{evalReport.cases_flagged_for_review}</strong><small>Flagged for review</small></div><div><strong>{evalReport.cases_not_run}</strong><small>Not run</small></div></div><h3>Recommendations</h3><ul>{evalReport.recommendations.map((item, i) => <li key={i}>{item}</li>)}</ul><h3>Limitations</h3><ul>{evalReport.limitations.map((item, i) => <li key={i}>{item}</li>)}</ul><button type="button" className="refresh" onClick={() => { const blob = new Blob([JSON.stringify(evalReport, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'nexus-evaluation-report.json'; link.click(); URL.revokeObjectURL(url); }}>Export JSON report</button></div>}
       </section>
       <section className="chat-panel">
-        <div className="chat-heading"><div><strong><Bot size={17}/> NEXUS Assistant</strong><span>Responses are labeled with the real provider and model.</span></div><div className="chat-heading-actions"><button type="button" className="refresh" onClick={() => { setMessages([{ role: 'assistant', text: 'Welcome to NEXUS AI. I will only show capabilities that are actually configured and reachable. Connect a local Ollama model to begin.' }]); setError(''); setDraft(''); }}>Clear chat</button><span className="beta">EARLY ACCESS</span></div></div>
+        <div className="chat-heading"><div><strong><Bot size={17}/> NEXUS Assistant</strong><span>Responses are labeled with the real provider and model.</span></div><div className="chat-heading-actions"><button type="button" className="refresh" onClick={() => { setMessages([{ role: 'assistant', text: 'Welcome to NEXUS AI. I will only show capabilities that are actually configured and reachable. Connect a local Ollama model to begin.' }]); setError(''); setDraft(''); setAttachedImages([]); setImageError(''); }}>Clear chat</button><span className="beta">EARLY ACCESS</span></div></div>
         <div className="messages">{messages.map((m, i) => <div className={'message ' + m.role} key={i}><div className="message-icon">{m.role === 'assistant' ? <Sparkles size={16}/> : 'Y'}</div><div className="message-body"><p>{m.text}</p>{m.provider && <small className="model-label">{m.provider} · {m.model}</small>}</div></div>)}{busy && <div className="message assistant"><div className="message-icon"><Sparkles size={16}/></div><div className="typing"><i/><i/><i/></div></div>}</div>
         {error && <div className="error-note">{error}</div>}
-        <form className="composer" onSubmit={sendMessage}><div className="model-picker"><label htmlFor="model-choice">MODEL</label><select id="model-choice" value={selectedModel} onChange={e => setSelectedModel(e.target.value)}><option value="">Auto / default local model</option>{modelOptions.map(model => <option key={model.id} value={model.id}>{model.label}</option>)}</select><span>{modelOptions.length ? modelOptions.length + ' connected model(s)' : 'No model connected'}</span></div><textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="Ask anything… (requires a running local model)" rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} /><div className="composer-footer"><span>Enter to send · Shift + Enter for new line</span><button type="submit" disabled={busy || !draft.trim()} aria-label="Send message"><ArrowUp size={18}/></button></div></form>
+        <form className="composer" onSubmit={sendMessage}><div className="model-picker"><label htmlFor="model-choice">MODEL</label><select id="model-choice" value={selectedModel} onChange={e => setSelectedModel(e.target.value)}><option value="">Auto / default local model</option>{modelOptions.map(model => <option key={model.id} value={model.id}>{model.label}</option>)}</select><span>{modelOptions.length ? modelOptions.length + ' connected model(s)' : 'No model connected'}</span></div>
+          {attachedImages.length > 0 && <div className="attached-images">{attachedImages.map((item, index) => <div className="attached-image" key={item.name + index}><img src={item.preview} alt={item.name}/><span>{item.name}</span><button type="button" aria-label={'Remove ' + item.name} onClick={() => setAttachedImages(prev => prev.filter((_, i) => i !== index))}>×</button></div>)}</div>}
+          {imageError && <p className="error-note image-error" role="alert">{imageError}</p>}
+          <div className="composer-tools"><label className="attach-image" title="Attach up to 2 images"><Image size={15}/> Add image<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple onChange={async e => {
+            const files = Array.from(e.target.files || []); e.target.value = '';
+            setImageError('');
+            if (attachedImages.length + files.length > 2) { setImageError('You can attach at most 2 images per message.'); return; }
+            const allowed = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+            const next = [];
+            for (const file of files) {
+              if (!allowed.includes(file.type)) { setImageError('Use PNG, JPEG, GIF, or WebP images only.'); return; }
+              if (file.size > 4 * 1024 * 1024) { setImageError('Each image must be 4 MiB or smaller.'); return; }
+              try {
+                const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Could not read image.')); reader.readAsDataURL(file); });
+                next.push({ name: file.name, data: dataUrl.split(',')[1], preview: dataUrl });
+              } catch { setImageError('Could not read one of the selected images.'); return; }
+            }
+            setAttachedImages(prev => [...prev, ...next].slice(0, 2));
+          }}/></label><span>Vision model required · max 2 images, 4 MiB each</span></div>
+          <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="Ask anything… (requires a running local model)" rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} /><div className="composer-footer"><span>Enter to send · Shift + Enter for new line</span><button type="submit" disabled={busy || (!draft.trim() && attachedImages.length === 0)} aria-label="Send message"><ArrowUp size={18}/></button></div></form>
         <p className="privacy-note"><CheckCircle2 size={14}/> No silent paid fallback. Provider availability is reported honestly.</p>
       </section>
       <footer>NEXUS AI <span>·</span> Modular by design <span>·</span> Build 0.1.0</footer>
