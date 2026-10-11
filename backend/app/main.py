@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from .catalog import build_catalog
 from .capabilities import build_capability_registry
 from .integrations import integration_registry
+from .video_planner import build_video_plan
 from .providers.base import ChatRequest, ProviderError
 from .providers.ollama import OllamaProvider
 
@@ -41,6 +42,14 @@ app.add_middleware(
 class ChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
     model: str | None = Field(default=None, max_length=200)
+
+
+class VideoPlanBody(BaseModel):
+    prompt: str = Field(min_length=1, max_length=20000)
+    target_duration_seconds: int = Field(ge=1, le=3600)
+    provider_id: str | None = Field(default=None, max_length=200)
+    segment_limit_seconds: int | None = Field(default=None, ge=1, le=3600)
+    stitching_allowed: bool | None = None
 
 
 @app.get("/health")
@@ -84,3 +93,17 @@ async def capabilities():
 @app.get("/api/v1/integrations")
 async def integrations():
     return integration_registry()
+
+
+@app.post("/api/v1/video/plan")
+async def video_plan(body: VideoPlanBody):
+    try:
+        return build_video_plan(
+            body.prompt,
+            body.target_duration_seconds,
+            body.segment_limit_seconds,
+            provider_id=body.provider_id,
+            stitching_allowed=body.stitching_allowed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
