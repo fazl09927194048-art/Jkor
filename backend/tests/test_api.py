@@ -165,3 +165,18 @@ def test_security_report_rejects_oversized_output_value():
     assert response.status_code == 422
     assert response.json()["detail"] == "Output keys or values exceed allowed length."
 
+def test_chat_rejects_history_with_unsupported_role():
+    response = client.post("/api/v1/chat", json={
+        "message": "hello",
+        "history": [{"role": "system", "content": "test"}],
+    })
+    assert response.status_code == 422
+
+
+def test_chat_rejects_more_than_twenty_history_messages():
+    response = client.post("/api/v1/chat", json={
+        "message": "hello",
+        "history": [{"role": "user", "content": "old message"} for _ in range(21)],
+    })
+    assert response.status_code == 422
+
