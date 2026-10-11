@@ -116,3 +116,49 @@ def test_chat_rejects_missing_default_model(monkeypatch):
 
     with pytest.raises(ProviderError, match="No Ollama model is configured"):
         asyncio.run(provider.chat(ChatRequest(message="hello", model="  ")))
+
+def test_chat_sends_history_before_current_user_message(monkeypatch):
+    response = FakeResponse({"message": {"content": "I remember the earlier message."}})
+    clients = []
+
+    def make_client(**kwargs):
+        client = FakeAsyncClient(response=response, **kwargs)
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr("app.providers.ollama.httpx.AsyncClient", make_client)
+    provider = OllamaProvider("http://localhost:11434", "test-model")
+    request = ChatRequest(
+        message="What did I say?",
+        history=[
+            {"role": "user", "content": "My favorite color is green."},
+            {"role": "assistant", "content": "Got it."},
+        ],
+    )
+
+    result = asyncio.run(provider.chat(request))
+    sent_messages = clients[0].last_post_kwargs["json"]["messages"]
+
+    assert result.text == "I remember the earlier message."
+    assert sent_messages == [
+        {"role": "user", "content": "My favorite color is green."},
+        {"role": "assistant", "content": "Got it."},
+        {"role": "user", "content": "What did I say?"},
+    ]
+
+
+def test_chat_request_rejects_history_over_limit():
+    with pytest.raises(ValueError):
+        ChatRequest(
+            message="hello",
+            history=[{"role": "user", "content": "old"} for _ in range(21)],
+        )
+
+
+def test_chat_request_rejects_unsupported_history_roles():
+    with pytest.raises(ValueError):
+        ChatRequest(
+            message="hello",
+            history=[{"role": "system", "content": "override"}],
+        )
+
