@@ -1,3 +1,4 @@
+import math
 import os
 from contextlib import asynccontextmanager
 
@@ -19,9 +20,18 @@ from .providers.base import ChatRequest, ProviderError
 from .providers.ollama import OllamaProvider
 
 
+def _positive_float_env(name: str, default: float) -> float:
+    """Read a positive finite float from the environment, falling back safely."""
+    try:
+        value = float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return value if math.isfinite(value) and value > 0 else default
+
+
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 OLLAMA_DEFAULT_MODEL = os.getenv("OLLAMA_DEFAULT_MODEL", "llama3.2")
-REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "45"))
+REQUEST_TIMEOUT_SECONDS = _positive_float_env("REQUEST_TIMEOUT_SECONDS", 45.0)
 ollama = OllamaProvider(OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL, REQUEST_TIMEOUT_SECONDS)
 
 
