@@ -132,3 +132,36 @@ def test_positive_float_env_uses_safe_fallback(monkeypatch, raw_value, expected)
 def test_positive_float_env_uses_default_when_variable_is_missing(monkeypatch):
     monkeypatch.delenv("TEST_TIMEOUT_VALUE", raising=False)
     assert _positive_float_env("TEST_TIMEOUT_VALUE", 45.0) == 45.0
+
+def test_chat_returns_service_unavailable_when_local_provider_fails(monkeypatch):
+    from app.providers.base import ProviderError
+
+    async def fail_chat(_request):
+        raise ProviderError("Local Ollama is unavailable.")
+
+    monkeypatch.setattr("app.main.ollama.chat", fail_chat)
+    response = client.post("/api/v1/chat", json={"message": "hello"})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Local Ollama is unavailable."
+
+
+def test_security_report_rejects_too_many_outputs():
+    response = client.post("/api/v1/security/report", json={
+        "model_id": "local-test-model",
+        "outputs": {f"case-{index}": "test" for index in range(101)},
+    })
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "At most 100 supplied outputs are allowed."
+
+
+def test_security_report_rejects_oversized_output_value():
+    response = client.post("/api/v1/security/report", json={
+        "model_id": "local-test-model",
+        "outputs": {"case-1": "x" * 20001},
+    })
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Output keys or values exceed allowed length."
+
