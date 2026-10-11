@@ -189,3 +189,20 @@ def test_chat_rejects_invalid_or_unsupported_image_payloads():
     assert invalid.status_code == 422
     assert unsupported.status_code == 422
     assert too_many.status_code == 422
+
+
+def test_chat_accepts_a_valid_png_image_payload(monkeypatch):
+    from app.providers.base import ChatResult
+
+    async def capture_chat(request):
+        assert len(request.images) == 1
+        assert request.images[0] == "iVBORw0KGgo="
+        return ChatResult(provider="ollama", model="vision-test", text="Image received.")
+
+    monkeypatch.setattr("app.main.ollama.chat", capture_chat)
+    response = client.post("/api/v1/chat", json={
+        "message": "Describe this image",
+        "images": ["iVBORw0KGgo="],
+    })
+    assert response.status_code == 200
+    assert response.json()["text"] == "Image received."
