@@ -62,7 +62,11 @@ class OllamaProvider(ChatProvider):
                         "model": model,
                         "messages": [
                             *[item.model_dump() for item in request.history],
-                            {"role": "user", "content": request.message},
+                            {
+                                "role": "user",
+                                "content": request.message,
+                                **({"images": request.images} if request.images else {}),
+                            },
                         ],
                         "stream": False,
                     },
