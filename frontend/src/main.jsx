@@ -35,8 +35,22 @@ function App() {
     try {
       const response = await fetch(API + '/api/v1/catalog');
       if (!response.ok) throw new Error('API unavailable');
-      setCatalog(await response.json());
-      try { const integrationResponse = await fetch(API + '/api/v1/integrations'); if (integrationResponse.ok) { const integrationData = await integrationResponse.json(); setIntegrations(integrationData.integrations || []); } } catch { setIntegrations([]); }
+      const nextCatalog = await response.json();
+      setCatalog(nextCatalog);
+      const availableModels = (nextCatalog?.providers || []).flatMap(provider =>
+        (provider.models || []).filter(model => typeof model === 'string')
+      );
+      // Do not keep a selection that disappeared after Ollama refreshes its model list.
+      if (selectedModel && !availableModels.includes(selectedModel)) setSelectedModel('');
+      try {
+        const integrationResponse = await fetch(API + '/api/v1/integrations');
+        if (integrationResponse.ok) {
+          const integrationData = await integrationResponse.json();
+          setIntegrations(Array.isArray(integrationData.integrations) ? integrationData.integrations : []);
+        }
+      } catch {
+        setIntegrations([]);
+      }
     } catch {
       setCatalog(null);
     }
@@ -89,8 +103,8 @@ function App() {
       refreshCatalog();
     } catch (err) {
       const note = err.message || 'Could not connect to NEXUS AI API.';
+      // The persistent error banner already reports this failure; avoid duplicating it in chat.
       setError(note);
-      setMessages(prev => [...prev, { role: 'assistant', text: 'I could not complete that request: ' + note }]);
     } finally {
       setBusy(false);
     }
