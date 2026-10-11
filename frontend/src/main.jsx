@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowUp, Bot, BrainCircuit, CheckCircle2, Code2, FileText, Image, Mic, Search, Settings2, Sparkles, Video, Wifi, WifiOff } from 'lucide-react';
+import { Activity, ArrowUp, Bot, BrainCircuit, CheckCircle2, Code2, FileText, Image, Mic, Search, Settings2, Sparkles, Video, Wifi, WifiOff, Volume2, VolumeX } from 'lucide-react';
 import './styles.css';
 
 const API = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : window.location.origin)).replace(/\/$/, '');
@@ -23,6 +23,9 @@ function App() {
   const [draft, setDraft] = useState('');
   const [attachedImages, setAttachedImages] = useState([]);
   const [imageError, setImageError] = useState('');
+  const [voiceError, setVoiceError] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState(null);
   const [selectedModel, setSelectedModel] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -83,6 +86,55 @@ function App() {
       setEvalReport(data);
     } catch (err) { setEvalError(err.message || 'Could not create report.'); }
     finally { setEvalBusy(false); }
+  }
+
+  function startVoiceInput() {
+    setVoiceError('');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceError('Voice input is not supported by this browser. Try Chrome or use the keyboard.');
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'fa-IR';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => setIsListening(true);
+      recognition.onresult = event => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (transcript) setDraft(prev => (prev.trim() ? prev.trim() + ' ' : '') + transcript);
+      };
+      recognition.onerror = event => {
+        setVoiceError(event.error === 'not-allowed'
+          ? 'Microphone permission was denied. Allow microphone access in browser settings.'
+          : 'Voice recognition failed (' + event.error + '). Try again or type your message.');
+      };
+      recognition.onend = () => setIsListening(false);
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      setVoiceError('Could not start the microphone. Check browser permissions and try again.');
+    }
+  }
+
+  function speakText(text, index) {
+    if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance === 'undefined') {
+      setVoiceError('Text-to-speech is not supported by this browser.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    if (speakingIndex === index) {
+      setSpeakingIndex(null);
+      return;
+    }
+    const utterance = new window.SpeechSynthesisUtterance(text);
+    utterance.lang = 'fa-IR';
+    utterance.onstart = () => setSpeakingIndex(index);
+    utterance.onend = () => setSpeakingIndex(null);
+    utterance.onerror = () => { setSpeakingIndex(null); setVoiceError('Could not speak this response. Check available voices on your device.'); };
+    window.speechSynthesis.speak(utterance);
   }
 
   async function sendMessage(event) {
@@ -168,12 +220,13 @@ function App() {
       </section>
       <section className="chat-panel">
         <div className="chat-heading"><div><strong><Bot size={17}/> NEXUS Assistant</strong><span>Responses are labeled with the real provider and model.</span></div><div className="chat-heading-actions"><button type="button" className="refresh" onClick={() => { setMessages([{ role: 'assistant', text: 'Welcome to NEXUS AI. I will only show capabilities that are actually configured and reachable. Connect a local Ollama model to begin.' }]); setError(''); setDraft(''); setAttachedImages([]); setImageError(''); }}>Clear chat</button><span className="beta">EARLY ACCESS</span></div></div>
-        <div className="messages">{messages.map((m, i) => <div className={'message ' + m.role} key={i}><div className="message-icon">{m.role === 'assistant' ? <Sparkles size={16}/> : 'Y'}</div><div className="message-body"><p>{m.text}</p>{m.provider && <small className="model-label">{m.provider} · {m.model}</small>}</div></div>)}{busy && <div className="message assistant"><div className="message-icon"><Sparkles size={16}/></div><div className="typing"><i/><i/><i/></div></div>}</div>
+        <div className="messages">{messages.map((m, i) => <div className={'message ' + m.role} key={i}><div className="message-icon">{m.role === 'assistant' ? <Sparkles size={16}/> : 'Y'}</div><div className="message-body"><p>{m.text}</p>{m.role === 'assistant' && <button type="button" className="speak-message" onClick={() => speakText(m.text, i)} aria-label={speakingIndex === i ? 'Stop speaking' : 'Read response aloud'}>{speakingIndex === i ? <VolumeX size={14}/> : <Volume2 size={14}/>} {speakingIndex === i ? 'Stop' : 'Read aloud'}</button>}{m.provider && <small className="model-label">{m.provider} · {m.model}</small>}</div></div>)}{busy && <div className="message assistant"><div className="message-icon"><Sparkles size={16}/></div><div className="typing"><i/><i/><i/></div></div>}</div>
         {error && <div className="error-note">{error}</div>}
         <form className="composer" onSubmit={sendMessage}><div className="model-picker"><label htmlFor="model-choice">MODEL</label><select id="model-choice" value={selectedModel} onChange={e => setSelectedModel(e.target.value)}><option value="">Auto / default local model</option>{modelOptions.map(model => <option key={model.id} value={model.id}>{model.label}</option>)}</select><span>{modelOptions.length ? modelOptions.length + ' connected model(s)' : 'No model connected'}</span></div>
           {attachedImages.length > 0 && <div className="attached-images">{attachedImages.map((item, index) => <div className="attached-image" key={item.name + index}><img src={item.preview} alt={item.name}/><span>{item.name}</span><button type="button" aria-label={'Remove ' + item.name} onClick={() => setAttachedImages(prev => prev.filter((_, i) => i !== index))}>×</button></div>)}</div>}
           {imageError && <p className="error-note image-error" role="alert">{imageError}</p>}
-          <div className="composer-tools"><label className="attach-image" title="Attach up to 2 images"><Image size={15}/> Add image<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple onChange={async e => {
+          {voiceError && <p className="error-note image-error" role="alert">{voiceError}</p>}
+          <div className="composer-tools"><div className="composer-tool-group"><label className="attach-image" title="Attach up to 2 images"><Image size={15}/> Add image<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple onChange={async e => {
             const files = Array.from(e.target.files || []); e.target.value = '';
             setImageError('');
             if (attachedImages.length + files.length > 2) { setImageError('You can attach at most 2 images per message.'); return; }
@@ -188,7 +241,7 @@ function App() {
               } catch { setImageError('Could not read one of the selected images.'); return; }
             }
             setAttachedImages(prev => [...prev, ...next].slice(0, 2));
-          }}/></label><span>Vision model required · max 2 images, 4 MiB each</span></div>
+          }}/></label><button type="button" className={'voice-input' + (isListening ? ' listening' : '')} onClick={startVoiceInput} disabled={isListening} title="Speak in Persian to fill the message"><Mic size={15}/>{isListening ? 'Listening…' : 'Speak'}</button></div><span>Images: max 2 · 4 MiB each. Voice uses browser speech services.</span></div>
           <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="Ask anything… (requires a running local model)" rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} /><div className="composer-footer"><span>Enter to send · Shift + Enter for new line</span><button type="submit" disabled={busy || (!draft.trim() && attachedImages.length === 0)} aria-label="Send message"><ArrowUp size={18}/></button></div></form>
         <p className="privacy-note"><CheckCircle2 size={14}/> No silent paid fallback. Provider availability is reported honestly.</p>
       </section>
