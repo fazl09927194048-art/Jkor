@@ -16,7 +16,8 @@ class OllamaProvider(ChatProvider):
             async with httpx.AsyncClient(timeout=3) as client:
                 response = await client.get(self.base_url + "/api/tags")
                 return response.is_success
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ValueError, TypeError):
+            # Invalid local configuration must not turn a health check into a 500.
             return False
 
     async def available_models(self) -> list[str]:
