@@ -30,11 +30,21 @@ class OllamaProvider(ChatProvider):
                 models = payload.get("models", [])
                 if not isinstance(models, list):
                     return []
-                return [
-                    item["name"]
-                    for item in models
-                    if isinstance(item, dict) and isinstance(item.get("name"), str) and item["name"].strip()
-                ]
+                # Normalize names and preserve order while removing duplicates.
+                # Provider payloads are external input, so ignore malformed entries.
+                names: list[str] = []
+                seen: set[str] = set()
+                for item in models:
+                    if not isinstance(item, dict):
+                        continue
+                    name = item.get("name")
+                    if not isinstance(name, str):
+                        continue
+                    name = name.strip()
+                    if name and name not in seen:
+                        names.append(name)
+                        seen.add(name)
+                return names
         except (httpx.HTTPError, ValueError, TypeError, AttributeError):
             return []
 
