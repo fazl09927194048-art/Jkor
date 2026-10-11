@@ -79,3 +79,13 @@ def test_available_models_validates_provider_payload(monkeypatch, payload, expec
     provider = OllamaProvider("http://localhost:11434", "test-model")
 
     assert asyncio.run(provider.available_models()) == expected
+
+
+def test_health_returns_false_when_client_configuration_is_invalid(monkeypatch):
+    def invalid_client(**kwargs):
+        raise ValueError("invalid URL or timeout configuration")
+
+    monkeypatch.setattr("app.providers.ollama.httpx.AsyncClient", invalid_client)
+    provider = OllamaProvider("not a valid URL", "test-model")
+
+    assert asyncio.run(provider.health()) is False
