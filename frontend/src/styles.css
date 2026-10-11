@@ -28,3 +28,5 @@
 .eval-report h3 { font-size: 13px; margin: 18px 0 8px; }
 .eval-report li { margin: 7px 0; color: var(--muted, #a2aabd); font-size: 13px; line-height: 1.5; }
 @media (max-width: 560px) { .security-lab { padding: 15px; } .eval-stats { gap: 6px; } .eval-stats div { padding: 9px; } .eval-stats strong { font-size: 19px; } }
+.chat-heading-actions{display:flex;align-items:center;gap:14px}.chat-heading-actions .refresh{padding:6px 8px;border:1px solid #294433;border-radius:6px;font-size:9px;margin:0}.chat-heading-actions .beta{display:block}
+@media(max-width:560px){.chat-heading-actions{gap:8px}.chat-heading-actions .refresh{font-size:8px;padding:6px}}
