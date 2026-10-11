@@ -18,7 +18,7 @@ Long-form media may use a multi-segment workflow only when the provider permits 
 
 Backend: run `pip install -r requirements.txt` inside `backend`, then `uvicorn app.main:app --reload`.
 
-Frontend: run `npm install` inside `frontend`, then `npm run dev`.
+Frontend: run `npm install` inside `frontend`, then `npm run dev`. The frontend uses `http://127.0.0.1:8000` in development. For a separate frontend/backend deployment, copy `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL` to the backend origin; same-origin deployments can leave it unset.
 
 API docs: `http://127.0.0.1:8000/docs`
 
@@ -32,6 +32,10 @@ Copy `backend/.env.example` to `backend/.env`. Never commit real API keys, passw
 - `GET /api/v1/capabilities`
 - `GET /api/v1/integrations`
 - `POST /api/v1/chat`
+- `POST /api/v1/video/plan` (planning only; no video is generated)
+- `GET /api/v1/security/eval-suite`
+- `POST /api/v1/security/score`
+- `POST /api/v1/security/report`
 
 ## Integration permissions
 
