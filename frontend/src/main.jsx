@@ -25,6 +25,7 @@ function App() {
   const [imageError, setImageError] = useState('');
   const [voiceError, setVoiceError] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [voiceConversation, setVoiceConversation] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(null);
   const [selectedModel, setSelectedModel] = useState('');
   const [busy, setBusy] = useState(false);
@@ -104,7 +105,11 @@ function App() {
       recognition.onstart = () => setIsListening(true);
       recognition.onresult = event => {
         const transcript = event.results?.[0]?.[0]?.transcript;
-        if (transcript) setDraft(prev => (prev.trim() ? prev.trim() + ' ' : '') + transcript);
+        if (transcript) {
+          const combined = (draft.trim() ? draft.trim() + ' ' : '') + transcript;
+          setDraft(voiceConversation ? '' : combined);
+          if (voiceConversation) sendMessage(null, combined);
+        }
       };
       recognition.onerror = event => {
         setVoiceError(event.error === 'not-allowed'
@@ -137,9 +142,9 @@ function App() {
     window.speechSynthesis.speak(utterance);
   }
 
-  async function sendMessage(event) {
+  async function sendMessage(event, overrideText) {
     if (event) event.preventDefault();
-    const message = draft.trim() || (attachedImages.length ? 'Describe the attached image(s).' : '');
+    const message = (typeof overrideText === 'string' ? overrideText : draft).trim() || (attachedImages.length ? 'Describe the attached image(s).' : '');
     if (!message || busy) return;
     setMessages(prev => [...prev, { role: 'user', text: message }]);
     setDraft('');
@@ -163,6 +168,7 @@ function App() {
       const payload = await readApiPayload(response, 'The API returned an unreadable response. Check that the backend URL is correct and the backend is running.');
       if (!response.ok) throw new Error(payload.detail || 'The model did not respond.');
       setMessages(prev => [...prev, { role: 'assistant', text: payload.text, provider: payload.provider, model: payload.model }]);
+      if (voiceConversation && typeof payload.text === 'string' && payload.text.trim()) speakText(payload.text, 'voice-auto');
       setAttachedImages([]); setImageError('');
       refreshCatalog();
     } catch (err) {
@@ -241,7 +247,7 @@ function App() {
               } catch { setImageError('Could not read one of the selected images.'); return; }
             }
             setAttachedImages(prev => [...prev, ...next].slice(0, 2));
-          }}/></label><button type="button" className={'voice-input' + (isListening ? ' listening' : '')} onClick={startVoiceInput} disabled={isListening} title="Speak in Persian to fill the message"><Mic size={15}/>{isListening ? 'Listening…' : 'Speak'}</button></div><span>Images: max 2 · 4 MiB each. Voice uses browser speech services.</span></div>
+          }}/></label><button type="button" className={'voice-input' + (isListening ? ' listening' : '')} onClick={startVoiceInput} disabled={isListening} title="Speak in Persian to fill the message"><Mic size={15}/>{isListening ? 'Listening…' : 'Speak'}</button><button type="button" className={'voice-input' + (voiceConversation ? ' listening' : '')} onClick={() => { setVoiceConversation(prev => { const next = !prev; if (!next && 'speechSynthesis' in window) window.speechSynthesis.cancel(); return next; }); setVoiceError(''); }} aria-pressed={voiceConversation} title="When enabled, each recognized turn is sent automatically and the model reply is read aloud"><Volume2 size={15}/>{voiceConversation ? 'Voice chat: On' : 'Voice chat: Off'}</button></div><span>Images: max 2 · 4 MiB each. Voice chat uses browser speech services.</span></div>
           <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="Ask anything… (requires a running local model)" rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} /><div className="composer-footer"><span>Enter to send · Shift + Enter for new line</span><button type="submit" disabled={busy || (!draft.trim() && attachedImages.length === 0)} aria-label="Send message"><ArrowUp size={18}/></button></div></form>
         <p className="privacy-note"><CheckCircle2 size={14}/> No silent paid fallback. Provider availability is reported honestly.</p>
       </section>
