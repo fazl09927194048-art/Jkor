@@ -13,6 +13,7 @@ from .catalog import build_catalog
 from .capabilities import build_capability_registry
 from .integrations import integration_registry
 from .ai_security_eval import build_eval_suite, score_supplied_outputs
+from .model_eval_report import build_eval_report
 from .video_planner import build_video_plan
 from .providers.base import ChatRequest, ProviderError
 from .providers.ollama import OllamaProvider
@@ -127,3 +128,22 @@ async def security_eval_score(body: SecurityEvalOutputs):
     if any(len(key) > 200 or len(value) > 20000 for key, value in body.outputs.items()):
         raise HTTPException(status_code=422, detail="Output keys or values exceed allowed length.")
     return score_supplied_outputs(body.outputs)
+
+
+class SecurityEvalReportBody(BaseModel):
+    model_id: str = Field(min_length=1, max_length=200)
+    model_version: str | None = Field(default=None, max_length=200)
+    outputs: dict[str, str] = Field(default_factory=dict)
+
+
+@app.post("/api/v1/security/report")
+async def security_eval_report(body: SecurityEvalReportBody):
+    if len(body.outputs) > 100:
+        raise HTTPException(status_code=422, detail="At most 100 supplied outputs are allowed.")
+    if any(len(key) > 200 or len(value) > 20000 for key, value in body.outputs.items()):
+        raise HTTPException(status_code=422, detail="Output keys or values exceed allowed length.")
+    triage = score_supplied_outputs(body.outputs)
+    try:
+        return build_eval_report(body.model_id, triage, model_version=body.model_version)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
