@@ -67,7 +67,7 @@ class FakeGetClient(FakeAsyncClient):
         ([], []),
         ({"models": "not-a-list"}, []),
         ({"models": [None, {}, {"name": 7}, {"name": "  "}]}, []),
-        ({"models": [{"name": "llama3.2"}, {"name": "qwen2.5"}]}, ["llama3.2", "qwen2.5"]),
+        ({"models": [{"name": " llama3.2 "}, {"name": "qwen2.5"}, {"name": "llama3.2"}, {"name": ""}]}, ["llama3.2", "qwen2.5"]),
     ],
 )
 def test_available_models_validates_provider_payload(monkeypatch, payload, expected):
