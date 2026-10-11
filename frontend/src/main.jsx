@@ -8,6 +8,7 @@ const icons = { chat: BrainCircuit, coding: Code2, vision: Image, image_generati
 
 function App() {
   const [catalog, setCatalog] = useState(null);
+  const [integrations, setIntegrations] = useState([]);
   const [messages, setMessages] = useState([{ role: 'assistant', text: 'Welcome to NEXUS AI. I will only show capabilities that are actually configured and reachable. Connect a local Ollama model to begin.' }]);
   const [draft, setDraft] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
@@ -19,6 +20,7 @@ function App() {
       const response = await fetch(API + '/api/v1/catalog');
       if (!response.ok) throw new Error('API unavailable');
       setCatalog(await response.json());
+      try { const integrationResponse = await fetch(API + '/api/v1/integrations'); if (integrationResponse.ok) { const integrationData = await integrationResponse.json(); setIntegrations(integrationData.integrations || []); } } catch { setIntegrations([]); }
     } catch {
       setCatalog(null);
     }
@@ -79,6 +81,7 @@ function App() {
       <header className="topbar"><div><span className="eyebrow">PERSONAL INTELLIGENCE SYSTEM</span><h1>AI Workspace</h1></div><div className="top-actions"><span className="status-pill"><i className={catalog ? 'dot live' : 'dot'} />{catalog ? 'API connected' : 'API offline'}</span><div className="avatar">N</div></div></header>
       <section className="welcome"><div className="orb"><BrainCircuit size={28}/></div><div><h2>Think beyond one model.</h2><p>One interface for your AI tools. Local-first, provider-neutral, transparent.</p></div></section>
       <section className="hub-section"><div className="hub-title"><div><span className="eyebrow">MODEL & TOOL DIRECTORY</span><h2>Capability Hub</h2></div><span className="hub-count">{capabilities.filter(item => item.status === 'available').length} active · {capabilities.length} listed</span></div><div className="capability-grid">{capabilities.map(item => { const Icon = icons[item.id] || Bot; return <div className="capability-card" key={item.id}><div className="capability-card-icon"><Icon size={17}/></div><div className="capability-card-copy"><strong>{item.label}</strong><small>{item.status === 'available' ? 'Ready to use' : item.status === 'needs_provider' ? 'Connect a model' : 'Planned integration'}</small></div><i className={item.status === 'available' ? 'dot live' : 'dot'} /></div>; })}</div></section>
+      <section className="integrations-section"><div className="hub-title"><div><span className="eyebrow">ACCOUNT ACCESS</span><h2>Integrations & Permissions</h2></div></div><div className="integration-grid">{(integrations.length ? integrations : [{id:'github',name:'GitHub',status:'needs_oauth_setup',note:'Official OAuth setup required before NEXUS can access your account.'}]).map(item => <div className="integration-card" key={item.id}><div className="integration-brand"><Code2 size={18}/></div><div className="integration-copy"><strong>{item.name}</strong><small>{item.status === 'needs_oauth_setup' ? 'Setup required' : item.status === 'oauth_configured_not_connected' ? 'OAuth configured · not connected' : item.status}</small><p>{item.note || 'Connection status is verified by the backend.'}</p></div><span className="permission-state"><i className="dot"/>{item.status === 'needs_oauth_setup' ? 'Not connected' : 'Not connected'}</span></div>)}</div><p className="permission-footnote">NEXUS will request scoped permissions through the official provider flow. High-risk actions require separate confirmation.</p></section>
       <section className="chat-panel">
         <div className="chat-heading"><div><strong><Bot size={17}/> NEXUS Assistant</strong><span>Responses are labeled with the real provider and model.</span></div><span className="beta">EARLY ACCESS</span></div>
         <div className="messages">{messages.map((m, i) => <div className={'message ' + m.role} key={i}><div className="message-icon">{m.role === 'assistant' ? <Sparkles size={16}/> : 'Y'}</div><div className="message-body"><p>{m.text}</p>{m.provider && <small className="model-label">{m.provider} · {m.model}</small>}</div></div>)}{busy && <div className="message assistant"><div className="message-icon"><Sparkles size={16}/></div><div className="typing"><i/><i/><i/></div></div>}</div>
