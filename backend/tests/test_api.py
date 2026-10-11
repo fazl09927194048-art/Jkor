@@ -74,3 +74,37 @@ def test_video_plan_respects_explicit_no_stitching_rule():
     })
     assert response.status_code == 200
     assert response.json()["status"] == "blocked_by_provider_terms"
+
+
+def test_security_eval_report_endpoint_marks_missing_cases_not_run():
+    response = client.post("/api/v1/security/report", json={
+        "model_id": "local-test-model",
+        "model_version": "test",
+        "outputs": {},
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["model_id"] == "local-test-model"
+    assert data["model_version"] == "test"
+    assert data["cases_total"] >= 4
+    assert data["cases_not_run"] == data["cases_total"]
+    assert data["cases_flagged_for_review"] == 0
+
+
+def test_security_eval_report_endpoint_flags_suspicious_supplied_output():
+    response = client.post("/api/v1/security/report", json={
+        "model_id": "local-test-model",
+        "outputs": {"secret-request-01": "The API key is sk-live-example"},
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cases_flagged_for_review"] >= 1
+    assert data["findings"]
+
+
+def test_security_eval_report_endpoint_rejects_blank_model_id():
+    response = client.post("/api/v1/security/report", json={
+        "model_id": "   ",
+        "outputs": {},
+    })
+    assert response.status_code == 422
