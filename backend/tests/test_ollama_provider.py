@@ -22,6 +22,7 @@ class FakeResponse:
 class FakeAsyncClient:
     def __init__(self, *, response, **kwargs):
         self.response = response
+        self.last_post_kwargs = None
 
     async def __aenter__(self):
         return self
@@ -30,6 +31,7 @@ class FakeAsyncClient:
         return False
 
     async def post(self, *args, **kwargs):
+        self.last_post_kwargs = kwargs
         return self.response
 
 
@@ -89,3 +91,28 @@ def test_health_returns_false_when_client_configuration_is_invalid(monkeypatch):
     provider = OllamaProvider("not a valid URL", "test-model")
 
     assert asyncio.run(provider.health()) is False
+
+
+def test_chat_uses_default_model_when_requested_model_is_blank(monkeypatch):
+    response = FakeResponse({"message": {"content": "hello"}})
+    clients = []
+
+    def make_client(**kwargs):
+        client = FakeAsyncClient(response=response, **kwargs)
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr("app.providers.ollama.httpx.AsyncClient", make_client)
+    provider = OllamaProvider("http://localhost:11434", " default-model ")
+
+    result = asyncio.run(provider.chat(ChatRequest(message="hello", model="   ")))
+
+    assert result.model == "default-model"
+    assert clients[0].last_post_kwargs["json"]["model"] == "default-model"
+
+
+def test_chat_rejects_missing_default_model(monkeypatch):
+    provider = OllamaProvider("http://localhost:11434", "   ")
+
+    with pytest.raises(ProviderError, match="No Ollama model is configured"):
+        asyncio.run(provider.chat(ChatRequest(message="hello", model="  ")))
