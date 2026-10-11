@@ -42,8 +42,13 @@ class OllamaProvider(ChatProvider):
                     },
                 )
                 response.raise_for_status()
-                payload = response.json()
-                answer = payload.get("message", {}).get("content")
+                try:
+                    payload = response.json()
+                    message = payload.get("message") if isinstance(payload, dict) else None
+                    answer = message.get("content") if isinstance(message, dict) else None
+                except (ValueError, TypeError, AttributeError) as exc:
+                    raise ProviderError("Ollama returned malformed JSON.") from exc
+
                 if not isinstance(answer, str) or not answer.strip():
                     raise ProviderError("Ollama returned an empty or invalid response.")
                 return ChatResult(provider=self.name, model=model, text=answer)
