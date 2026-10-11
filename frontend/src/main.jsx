@@ -6,6 +6,16 @@ import './styles.css';
 const API = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : window.location.origin)).replace(/\/$/, '');
 const icons = { chat: BrainCircuit, coding: Code2, vision: Image, image_generation: Image, audio: Mic, video: Video, documents: FileText, research: Search };
 
+async function readApiPayload(response, fallbackMessage) {
+  try {
+    const payload = await response.json();
+    if (payload && typeof payload === 'object') return payload;
+  } catch {
+    // Proxies and hosting platforms sometimes return HTML or an empty body on errors.
+  }
+  return { detail: fallbackMessage };
+}
+
 function App() {
   const [catalog, setCatalog] = useState(null);
   const [integrations, setIntegrations] = useState([]);
@@ -52,7 +62,7 @@ function App() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model_id: evalModel.trim(), outputs })
       });
-      const data = await response.json();
+      const data = await readApiPayload(response, 'The API returned an unreadable response. Check that the backend URL is correct and the backend is running.');
       if (!response.ok) throw new Error(data.detail || 'Report generation failed.');
       setEvalReport(data);
     } catch (err) { setEvalError(err.message || 'Could not create report.'); }
@@ -73,7 +83,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, ...(selectedModel ? { model: selectedModel } : {}) })
       });
-      const payload = await response.json();
+      const payload = await readApiPayload(response, 'The API returned an unreadable response. Check that the backend URL is correct and the backend is running.');
       if (!response.ok) throw new Error(payload.detail || 'The model did not respond.');
       setMessages(prev => [...prev, { role: 'assistant', text: payload.text, provider: payload.provider, model: payload.model }]);
       refreshCatalog();
