@@ -87,7 +87,7 @@ function App() {
 
   async function sendMessage(event) {
     if (event) event.preventDefault();
-    const message = draft.trim();
+    const message = draft.trim() || (attachedImages.length ? 'Describe the attached image(s).' : '');
     if (!message || busy) return;
     setMessages(prev => [...prev, { role: 'user', text: message }]);
     setDraft('');
