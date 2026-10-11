@@ -1,6 +1,8 @@
+import pytest
+
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import _positive_float_env, app
 
 
 client = TestClient(app)
@@ -108,3 +110,25 @@ def test_security_eval_report_endpoint_rejects_blank_model_id():
         "outputs": {},
     })
     assert response.status_code == 422
+
+
+
+@pytest.mark.parametrize(
+    "raw_value, expected",
+    [
+        ("30", 30.0),
+        ("not-a-number", 45.0),
+        ("0", 45.0),
+        ("-5", 45.0),
+        ("nan", 45.0),
+        ("inf", 45.0),
+    ],
+)
+def test_positive_float_env_uses_safe_fallback(monkeypatch, raw_value, expected):
+    monkeypatch.setenv("TEST_TIMEOUT_VALUE", raw_value)
+    assert _positive_float_env("TEST_TIMEOUT_VALUE", 45.0) == expected
+
+
+def test_positive_float_env_uses_default_when_variable_is_missing(monkeypatch):
+    monkeypatch.delenv("TEST_TIMEOUT_VALUE", raising=False)
+    assert _positive_float_env("TEST_TIMEOUT_VALUE", 45.0) == 45.0
