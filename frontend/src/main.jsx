@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Activity, ArrowUp, Bot, BrainCircuit, CheckCircle2, Code2, FileText, Image, Mic, Search, Settings2, Sparkles, Video, Wifi, WifiOff } from 'lucide-react';
 import './styles.css';
 
-const API = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const API = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : window.location.origin)).replace(/\\/$/, '');
 const icons = { chat: BrainCircuit, coding: Code2, vision: Image, image_generation: Image, audio: Mic, video: Video, documents: FileText, research: Search };
 
 function App() {
