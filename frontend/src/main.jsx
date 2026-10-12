@@ -150,8 +150,11 @@ function App() {
     setDraft('');
     setBusy(true);
     setError('');
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 60000);
     try {
       const response = await fetch(API + '/api/v1/chat', {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -173,10 +176,13 @@ function App() {
       setAttachedImages([]); setImageError('');
       refreshCatalog();
     } catch (err) {
-      const note = err.message || 'Could not connect to NEXUS AI API.';
+      const note = err.name === 'AbortError'
+        ? 'The model took too long to respond (60-second limit). Check whether Ollama is running and the selected model is loaded, then retry.'
+        : (err.message || 'Could not connect to NEXUS AI API. Check the backend URL and network connection.');
       // The persistent error banner already reports this failure; avoid duplicating it in chat.
       setError(note);
     } finally {
+      window.clearTimeout(timeoutId);
       setBusy(false);
     }
   }
